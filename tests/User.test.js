@@ -2,7 +2,8 @@
 import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import supertest from "supertest";
-import { app, User } from "../app.js";
+import app from "../app.js";
+import { User } from "../models/User.js";
 
 const request = supertest(app);
 let mongoServer;
@@ -29,17 +30,13 @@ afterAll(async () => {
   await mongoServer.stop();
 });
 
-// Test cases
 describe("User API", () => {
-  // Test getting all users (empty array initially)
   test("GET /api/users should return empty array initially", async () => {
     const response = await request.get("/api/users");
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual([]);
   });
-
-  // Test creating a new user
   test("POST /api/users should create a new user", async () => {
     const userData = {
       name: "Test User",
@@ -53,8 +50,6 @@ describe("User API", () => {
     expect(response.body.name).toBe(userData.name);
     expect(response.body.email).toBe(userData.email);
   });
-
-  // Test that we can retrieve users after creating one
   test("GET /api/users should return array with users", async () => {
     // First create a user
     const userData = {
@@ -71,8 +66,6 @@ describe("User API", () => {
     expect(response.body.length).toBe(1);
     expect(response.body[0].name).toBe(userData.name);
   });
-
-  // Test that we get validation error for missing fields
   test("POST /api/users should return 400 if required fields are missing", async () => {
     const incompleteUserData = {
       name: "Incomplete User",
@@ -84,8 +77,6 @@ describe("User API", () => {
     expect(response.status).toBe(400);
     expect(response.body).toHaveProperty("message");
   });
-
-  // Test duplicate email validation
   test("POST /api/users should return 400 for duplicate email", async () => {
     const userData = {
       name: "Original User",
