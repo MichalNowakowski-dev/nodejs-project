@@ -7,6 +7,7 @@ import { User } from "../models/User.js";
 
 const request = supertest(app);
 let mongoServer;
+let token;
 
 // Set up the in-memory database before tests
 beforeAll(async () => {
@@ -20,8 +21,16 @@ beforeAll(async () => {
 
 // Clear the database between tests
 beforeEach(async () => {
-  // Clear all collections before each test
   await User.deleteMany({});
+
+  // Register a user and get the token
+  const response = await request.post("/api/auth/register").send({
+    name: "Test Auth User",
+    email: "authusertest@example.com",
+    password: "testpassword",
+  });
+
+  token = response.body.token;
 });
 
 // Disconnect and close MongoDB after all tests
@@ -31,19 +40,21 @@ afterAll(async () => {
 });
 
 describe("User API", () => {
-  test("GET /api/users should return empty array initially", async () => {
-    const response = await request.get("/api/users");
-
+  test("GET /api/users should return array with one user", async () => {
+    const response = await request
+      .get("/api/users")
+      .set("Authorization", `Bearer ${token}`);
     expect(response.status).toBe(200);
-    expect(response.body).toEqual([]);
+    expect(response.body.length).toBe(1);
   });
-  test("POST /api/users should create a new user", async () => {
+  test("POST /api/auth/register should create a new user", async () => {
     const userData = {
       name: "Test User",
       email: "test@example.com",
+      password: "password123",
     };
 
-    const response = await request.post("/api/users").send(userData);
+    const response = await request.post("/api/auth/register").send(userData);
 
     expect(response.status).toBe(201);
     expect(response.body).toHaveProperty("_id");
@@ -55,39 +66,45 @@ describe("User API", () => {
     const userData = {
       name: "Another Test User",
       email: "another@example.com",
+      password: "password12345",
     };
 
-    await request.post("/api/users").send(userData);
+    await request.post("/api/auth/register").send(userData);
 
     // Now get all users
-    const response = await request.get("/api/users");
+    const response = await request
+      .get("/api/users")
+      .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body.length).toBe(1);
-    expect(response.body[0].name).toBe(userData.name);
+    expect(response.body.length).toBe(2); // One from before and one just created
+    expect(response.body[1].name).toBe(userData.name);
   });
-  test("POST /api/users should return 400 if required fields are missing", async () => {
+  test("POST /api/auth/register should return 400 if required fields are missing", async () => {
     const incompleteUserData = {
       name: "Incomplete User",
-      // Missing email field
+      email: "email@xxx.com",
+      // missing psasword
     };
 
-    const response = await request.post("/api/users").send(incompleteUserData);
+    const response = await request
+      .post("/api/auth/register")
+      .send(incompleteUserData);
 
     expect(response.status).toBe(400);
     expect(response.body).toHaveProperty("message");
   });
-  test("POST /api/users should return 400 for duplicate email", async () => {
+  test("POST /api/auth/register should return 400 for duplicate email", async () => {
     const userData = {
       name: "Original User",
       email: "duplicate@example.com",
     };
 
     // Create first user
-    await request.post("/api/users").send(userData);
+    await request.post("/api/auth/register").send(userData);
 
     // Try to create another user with same email
-    const duplicateResponse = await request.post("/api/users").send({
+    const duplicateResponse = await request.post("/api/auth/register").send({
       name: "Duplicate User",
       email: "duplicate@example.com",
     });
